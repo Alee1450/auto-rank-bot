@@ -5,47 +5,58 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
-const pendingUsers = new Set();
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1098767779227770910";
 
-// add as many roles as you want here
 const WATCHED_ROLES = {
   "1475214818263961701": "Tester",
 };
 
-client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
-});
+let cachedUsers = [];
 
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
+async function refreshUsers() {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  const members = await guild.members.fetch();
+  const result = [];
+
   for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
-    if (!oldMember.roles.cache.has(roleId) &&
-         newMember.roles.cache.has(roleId)) {
-
-      const res = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${newMember.user.id}`, {
+    const roleMembers = members.filter(m => m.roles.cache.has(roleId));
+    for (const [, member] of roleMembers) {
+      const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
         headers: { "Authorization": BLOXLINK_API_KEY }
       });
-
-      const data = await res.json();
-
+      const data = await bloxRes.json();
       if (data.robloxID) {
-        console.log(`${newMember.user.username} got ${roleName} = Roblox ID ${data.robloxID}`);
-        pendingUsers.add(JSON.stringify({
-          discordId: newMember.user.id,
+        result.push({
+          discordId: member.user.id,
           robloxId: data.robloxID,
           role: roleName
-        }));
-      } else {
-        console.log(`${newMember.user.username} is not verified on Bloxlink`);
+        });
       }
+    }
+  }
+
+  cachedUsers = result;
+  console.log(`Cached ${cachedUsers.length} users`);
+}
+
+client.on('ready', async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+  await refreshUsers(); // fetch once on startup
+});
+
+// refresh cache whenever a role is given or removed
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  for (const roleId of Object.keys(WATCHED_ROLES)) {
+    if (oldMember.roles.cache.has(roleId) !== newMember.roles.cache.has(roleId)) {
+      await refreshUsers();
+      break;
     }
   }
 });
 
 app.get('/users', (req, res) => {
-  res.json({ users: [...pendingUsers].map(u => JSON.parse(u)) });
-  pendingUsers.clear();
+  res.json({ users: cachedUsers }); // just return the cache, no clearing
 });
 
 app.listen(3000, () => console.log('Server running on port 3000'));
