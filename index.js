@@ -13,8 +13,10 @@ const WATCHED_ROLES = {
 };
 
 let cachedUsers = [];
+let isRefreshing = false;
 
 async function refreshUsers() {
+  isRefreshing = true;
   const guild = client.guilds.cache.get(GUILD_ID);
   const members = await guild.members.fetch();
   const result = [];
@@ -37,15 +39,15 @@ async function refreshUsers() {
   }
 
   cachedUsers = result;
+  isRefreshing = false;
   console.log(`Cached ${cachedUsers.length} users`);
 }
 
 client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await refreshUsers(); // fetch once on startup
+  await refreshUsers();
 });
 
-// refresh cache whenever a role is given or removed
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   for (const roleId of Object.keys(WATCHED_ROLES)) {
     if (oldMember.roles.cache.has(roleId) !== newMember.roles.cache.has(roleId)) {
@@ -55,8 +57,18 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
   }
 });
 
-app.get('/users', (req, res) => {
-  res.json({ users: cachedUsers }); // just return the cache, no clearing
+app.get('/users', async (req, res) => {
+  if (isRefreshing) {
+    await new Promise(resolve => {
+      const check = setInterval(() => {
+        if (!isRefreshing) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+  res.json({ users: cachedUsers });
 });
 
 app.listen(3000, () => console.log('Server running on port 3000'));
