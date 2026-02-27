@@ -17,17 +17,26 @@ let isRefreshing = false;
 
 async function refreshUsers() {
   isRefreshing = true;
+  console.log("Refreshing users...");
   const guild = client.guilds.cache.get(GUILD_ID);
+  console.log("Guild:", guild ? guild.name : "NOT FOUND");
+  if (!guild) {
+    console.log("Guild not found! Check GUILD_ID");
+    isRefreshing = false;
+    return;
+  }
   const members = await guild.members.fetch();
+  console.log("Total members fetched:", members.size);
   const result = [];
-
   for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
     const roleMembers = members.filter(m => m.roles.cache.has(roleId));
+    console.log(`Members with ${roleName} role:`, roleMembers.size);
     for (const [, member] of roleMembers) {
       const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
         headers: { "Authorization": BLOXLINK_API_KEY }
       });
       const data = await bloxRes.json();
+      console.log("Bloxlink response for", member.user.username, ":", JSON.stringify(data));
       if (data.robloxID) {
         result.push({
           discordId: member.user.id,
@@ -37,7 +46,6 @@ async function refreshUsers() {
       }
     }
   }
-
   cachedUsers = result;
   isRefreshing = false;
   console.log(`Cached ${cachedUsers.length} users`);
