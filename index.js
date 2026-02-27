@@ -1,10 +1,10 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 const app = express();
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
-
 
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
@@ -19,11 +19,15 @@ let isRefreshing = false;
 async function refreshUsers() {
   isRefreshing = true;
   console.log("Refreshing users...");
-  const guild = client.guilds.cache.get(GUILD_ID);
+  let guild = client.guilds.cache.get(GUILD_ID);
   if (!guild) {
-    console.log("Guild not found!");
-    isRefreshing = false;
-    return;
+    try {
+      guild = await client.guilds.fetch(GUILD_ID);
+    } catch (err) {
+      console.log("Could not fetch guild:", err);
+      isRefreshing = false;
+      return;
+    }
   }
   const members = await guild.members.fetch();
   console.log("Total members fetched:", members.size);
