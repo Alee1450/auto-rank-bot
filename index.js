@@ -5,6 +5,7 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
+
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
 
@@ -52,7 +53,7 @@ async function refreshUsers() {
   console.log(`Cached ${cachedUsers.length} users`);
 }
 
-client.on('clientReady', async () => {
+client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   await refreshUsers();
 });
