@@ -6,10 +6,10 @@ const client = new Client({
 });
 
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
-const GUILD_ID = "1098767779227770910";
+const GUILD_ID = process.env.GUILD_ID;
 
 const WATCHED_ROLES = {
-  "1475214818263961701": "Tester",
+  "1164224293530521704": "Tester",
 };
 
 let cachedUsers = [];
