@@ -6,7 +6,7 @@ const client = new Client({
 });
 
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
-const GUILD_ID = process.env.GUILD_ID;
+const GUILD_ID = "1114960603262496869";
 
 const WATCHED_ROLES = {
   "1164224293530521704": "Tester",
