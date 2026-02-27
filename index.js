@@ -55,7 +55,11 @@ async function refreshUsers() {
 
 client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await refreshUsers();
+  try {
+    await refreshUsers();
+  } catch (err) {
+    console.error("refreshUsers error:", err);
+  }
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
