@@ -1,14 +1,12 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 const app = express();
-
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
-
 const WATCHED_ROLES = {
   "1164224293530521704": "Tester",
 };
@@ -25,7 +23,7 @@ async function refreshUsers() {
   for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
     const roleMembers = members.filter(m => m.roles.cache.has(roleId));
     for (const [, member] of roleMembers) {
-      const bloxRes = await fetch(https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}, {
+      const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
         headers: { "Authorization": BLOXLINK_API_KEY }
       });
       const data = await bloxRes.json();
@@ -38,13 +36,14 @@ async function refreshUsers() {
       }
     }
   }
+
   cachedUsers = result;
   isRefreshing = false;
-  console.log(Cached ${cachedUsers.length} users);
+  console.log(`Cached ${cachedUsers.length} users`);
 }
 
 client.on('clientReady', async () => {
-  console.log(Logged in as ${client.user.tag});
+  console.log(`Logged in as ${client.user.tag}`);
   await refreshUsers();
 });
 
