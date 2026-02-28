@@ -27,23 +27,23 @@ async function refreshUsers() {
           headers: { "Authorization": BLOXLINK_API_KEY }
         });
         const data = await bloxRes.json();
-if (data.robloxID) {
-  // fetch username from Roblox directly
-  const robloxRes = await fetch(`https://users.roblox.com/v1/users/${data.robloxID}`);
-  const robloxData = await robloxRes.json();
+        if (data.robloxID) {
+          // fetch username from Roblox directly
+          // const robloxRes = await fetch(`https://users.roblox.com/v1/users/${data.robloxID}`);
+          //const robloxData = await robloxRes.json();
 
-  result.push({
-    discordId: member.user.id,
-    robloxId: data.robloxID,
-    robloxUsername: robloxData.name,
-    role: roleName
-  });
-}
+          result.push({
+            discordId: member.user.id,
+            robloxId: data.robloxID,
+            //     robloxUsername: robloxData.name,
+            role: roleName
+          });
+        }
       }
     }
     cachedUsers = result;
     console.log(`Cached ${cachedUsers.length} users`);
-  } catch(e) {
+  } catch (e) {
     console.error("refreshUsers failed:", e);
   } finally {
     isRefreshing = false;
