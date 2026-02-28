@@ -34,7 +34,7 @@ async function refreshUsers() {
 
           result.push({
             discordId: member.user.id,
-            robloxId: data.robloxID,
+            userId: data.robloxID,
             //     robloxUsername: robloxData.name,
             role: roleName
           });
