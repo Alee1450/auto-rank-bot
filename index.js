@@ -9,67 +9,78 @@ const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
 
 let cachedUsers = {};
-let isRefreshing = false;
+let refreshingRoles = new Set();
 
-async function refreshCache() {
-  isRefreshing = true;
+async function refreshRole(roleName) {
+  if (refreshingRoles.has(roleName)) {
+    // Wait for it to finish
+    await new Promise(resolve => {
+      const check = setInterval(() => {
+        if (!refreshingRoles.has(roleName)) { clearInterval(check); resolve(); }
+      }, 100);
+    });
+    return;
+  }
+
+  refreshingRoles.add(roleName);
   try {
     const guild = client.guilds.cache.get(GUILD_ID);
     const members = await guild.members.fetch();
-    const newCache = {};
+    const role = guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+    if (!role) return;
 
-    for (const [, member] of members) {
+    const roleMembers = members.filter(m => m.roles.cache.has(role.id));
+    const result = [];
+
+    for (const [, member] of roleMembers) {
       const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
         headers: { "Authorization": BLOXLINK_API_KEY }
       });
       const data = await bloxRes.json();
       if (!data.robloxID) continue;
-
-      for (const [, role] of member.roles.cache) {
-        if (role.name === '@everyone') continue;
-        if (!newCache[role.name]) newCache[role.name] = [];
-        newCache[role.name].push({
-          discordId: member.user.id,
-          userId: data.robloxID,
-          role: role.name
-        });
-      }
+      result.push({
+        discordId: member.user.id,
+        userId: data.robloxID,
+        role: role.name
+      });
     }
 
-    cachedUsers = newCache;
-    console.log(`Cache refreshed for ${Object.keys(cachedUsers).length} roles`);
+    cachedUsers[role.name] = result;
+    console.log(`Cached ${result.length} users for role: ${role.name}`);
   } catch (e) {
-    console.error("refreshCache failed:", e);
+    console.error("refreshRole failed:", e);
   } finally {
-    isRefreshing = false;
+    refreshingRoles.delete(roleName);
   }
 }
 
-async function waitForRefresh() {
-  await new Promise(resolve => {
-    const check = setInterval(() => {
-      if (!isRefreshing) { clearInterval(check); resolve(); }
-    }, 100);
-  });
-}
-
-client.on('clientReady', async () => {
+client.on('clientReady', () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await refreshCache();
 });
 
-client.on('guildMemberUpdate', async () => {
-  await refreshCache();
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  // Find roles that changed and invalidate only those
+  const added = newMember.roles.cache.filter(r => !oldMember.roles.cache.has(r.id));
+  const removed = oldMember.roles.cache.filter(r => !newMember.roles.cache.has(r.id));
+  for (const [, role] of [...added, ...removed]) {
+    delete cachedUsers[role.name]; // invalidate so next request refreshes it
+  }
 });
 
 app.get('/users', async (req, res) => {
-  if (isRefreshing) await waitForRefresh();
-
   const roleName = req.query.role;
   if (!roleName) return res.status(400).json({ error: 'Missing ?role= query param' });
 
-  const users = cachedUsers[roleName] || [];
-  res.json({ users });
+  const guild = client.guilds.cache.get(GUILD_ID);
+  const role = guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+  if (!role) return res.status(404).json({ error: `Role "${roleName}" not found` });
+
+  // If not cached, fetch it now
+  if (!cachedUsers[role.name]) {
+    await refreshRole(role.name);
+  }
+
+  res.json({ users: cachedUsers[role.name] || [] });
 });
 
 app.get('/roles', (req, res) => {
