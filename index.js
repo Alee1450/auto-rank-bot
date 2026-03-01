@@ -4,13 +4,11 @@ const app = express();
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
-
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
 const WATCHED_ROLES = {
   "1164224293530521704": "Tester",
 };
-
 let cachedUsers = [];
 let isRefreshing = false;
 
@@ -20,18 +18,14 @@ async function refreshUsers() {
     const guild = client.guilds.cache.get(GUILD_ID);
     const members = await guild.members.fetch();
     const result = [];
-
     for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
       const testerRole = guild.roles.cache.get(roleId);
       if (!testerRole) continue;
-
       const roleMembers = members.filter(m => {
         if (!m.roles.cache.has(roleId)) return false;
-        // Exclude members who have any role with a higher position than Tester
         const hasHigherRole = m.roles.cache.some(r => r.position > testerRole.position);
         return !hasHigherRole;
       });
-
       for (const [, member] of roleMembers) {
         const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
           headers: { "Authorization": BLOXLINK_API_KEY }
@@ -46,7 +40,6 @@ async function refreshUsers() {
         }
       }
     }
-
     cachedUsers = result;
     console.log(`Cached ${cachedUsers.length} users`);
   } catch (e) {
@@ -82,6 +75,15 @@ app.get('/users', async (req, res) => {
     });
   }
   res.json({ users: cachedUsers });
+});
+
+app.get('/roles', (req, res) => {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) return res.status(500).json({ error: 'Guild not found' });
+  const roles = guild.roles.cache
+    .map(r => ({ id: r.id, name: r.name, position: r.position }))
+    .sort((a, b) => b.position - a.position);
+  res.json({ roles });
 });
 
 app.listen(3000, () => console.log('Server running on port 3000'));
