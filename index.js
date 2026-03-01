@@ -20,27 +20,33 @@ async function refreshUsers() {
     const guild = client.guilds.cache.get(GUILD_ID);
     const members = await guild.members.fetch();
     const result = [];
+
     for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
-      const roleMembers = members.filter(m => m.roles.cache.has(roleId));
+      const testerRole = guild.roles.cache.get(roleId);
+      if (!testerRole) continue;
+
+      const roleMembers = members.filter(m => {
+        if (!m.roles.cache.has(roleId)) return false;
+        // Exclude members who have any role with a higher position than Tester
+        const hasHigherRole = m.roles.cache.some(r => r.position > testerRole.position);
+        return !hasHigherRole;
+      });
+
       for (const [, member] of roleMembers) {
         const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
           headers: { "Authorization": BLOXLINK_API_KEY }
         });
         const data = await bloxRes.json();
         if (data.robloxID) {
-          // fetch username from Roblox directly
-          // const robloxRes = await fetch(`https://users.roblox.com/v1/users/${data.robloxID}`);
-          //const robloxData = await robloxRes.json();
-
           result.push({
             discordId: member.user.id,
             userId: data.robloxID,
-            //     robloxUsername: robloxData.name,
             role: roleName
           });
         }
       }
     }
+
     cachedUsers = result;
     console.log(`Cached ${cachedUsers.length} users`);
   } catch (e) {
