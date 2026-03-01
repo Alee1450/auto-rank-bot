@@ -32,18 +32,19 @@ async function refreshRole(roleName) {
     const roleMembers = members.filter(m => m.roles.cache.has(role.id));
     const result = [];
 
-    for (const [, member] of roleMembers) {
-      const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
-        headers: { "Authorization": BLOXLINK_API_KEY }
-      });
-      const data = await bloxRes.json();
-      if (!data.robloxID) continue;
-      result.push({
-        discordId: member.user.id,
-        userId: data.robloxID,
-        role: role.name
-      });
-    }
+for (const [, member] of roleMembers) {
+  const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
+    headers: { "Authorization": BLOXLINK_API_KEY }
+  });
+  const data = await bloxRes.json();
+  if (!data.robloxID) continue;
+  result.push({
+    discordId: member.user.id,
+    userId: data.robloxID,
+    role: role.name
+  });
+  await new Promise(r => setTimeout(r, 1000)); // 1 second between calls = max 60/min
+}
 
     cachedUsers[role.name] = result;
     console.log(`Cached ${result.length} users for role: ${role.name}`);
