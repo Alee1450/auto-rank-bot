@@ -4,77 +4,53 @@ const app = express();
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
+
 const BLOXLINK_API_KEY = process.env.BLOXLINK_KEY;
 const GUILD_ID = "1114960603262496869";
-const WATCHED_ROLES = {
-  "1164224293530521704": "Tester",
-};
-let cachedUsers = [];
-let isRefreshing = false;
 
-async function refreshUsers() {
-  isRefreshing = true;
-  try {
-    const guild = client.guilds.cache.get(GUILD_ID);
-    const members = await guild.members.fetch();
-    const result = [];
-    for (const [roleId, roleName] of Object.entries(WATCHED_ROLES)) {
-      const testerRole = guild.roles.cache.get(roleId);
-      if (!testerRole) continue;
-      const roleMembers = members.filter(m => {
-        if (!m.roles.cache.has(roleId)) return false;
-        const hasHigherRole = m.roles.cache.some(r => r.position > testerRole.position);
-        return !hasHigherRole;
-      });
-      for (const [, member] of roleMembers) {
-        const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
-          headers: { "Authorization": BLOXLINK_API_KEY }
-        });
-        const data = await bloxRes.json();
-        if (data.robloxID) {
-          result.push({
-            discordId: member.user.id,
-            userId: data.robloxID,
-            role: roleName
-          });
-        }
-      }
-    }
-    cachedUsers = result;
-    console.log(`Cached ${cachedUsers.length} users`);
-  } catch (e) {
-    console.error("refreshUsers failed:", e);
-  } finally {
-    isRefreshing = false;
-  }
+let cachedMembers = null;
+
+async function fetchMembers() {
+  const guild = client.guilds.cache.get(GUILD_ID);
+  cachedMembers = await guild.members.fetch();
 }
 
 client.on('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  await refreshUsers();
+  await fetchMembers();
 });
 
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
-  for (const roleId of Object.keys(WATCHED_ROLES)) {
-    if (oldMember.roles.cache.has(roleId) !== newMember.roles.cache.has(roleId)) {
-      await refreshUsers();
-      break;
-    }
-  }
+client.on('guildMemberUpdate', async () => {
+  await fetchMembers();
 });
 
 app.get('/users', async (req, res) => {
-  if (isRefreshing) {
-    await new Promise(resolve => {
-      const check = setInterval(() => {
-        if (!isRefreshing) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 100);
+  const roleName = req.query.role;
+  if (!roleName) return res.status(400).json({ error: 'Missing ?role= query param' });
+
+  const guild = client.guilds.cache.get(GUILD_ID);
+  const role = guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+  if (!role) return res.status(404).json({ error: `Role "${roleName}" not found` });
+
+  const members = cachedMembers || await guild.members.fetch();
+  const roleMembers = members.filter(m => m.roles.cache.has(role.id));
+
+  const result = [];
+  for (const [, member] of roleMembers) {
+    const bloxRes = await fetch(`https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${member.user.id}`, {
+      headers: { "Authorization": BLOXLINK_API_KEY }
     });
+    const data = await bloxRes.json();
+    if (data.robloxID) {
+      result.push({
+        discordId: member.user.id,
+        userId: data.robloxID,
+        role: role.name
+      });
+    }
   }
-  res.json({ users: cachedUsers });
+
+  res.json({ users: result });
 });
 
 app.get('/roles', (req, res) => {
